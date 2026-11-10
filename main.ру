@@ -1,0 +1,105 @@
+import os
+import random
+from telebot import TeleBot, types
+
+# Берем токен из настроек сервера
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "ВАШ_ТОКЕН_ИЗ_BOTFATHER")
+bot = TeleBot(BOT_TOKEN)
+
+# Простая база данных в памяти (после перезапуска обнуляется)
+# В ДЕМО-РЕЖИМЕ: даем сразу много денег
+players = {}
+
+MEMES = [
+    {"name": "Шрек", "rarity": "Обычный 🟢", "power": 10},
+    {"name": "Гигачад", "rarity": "Редкий 🔵", "power": 25},
+    {"name": "Скибиди Туалет", "rarity": "Эпический 🟣", "power": 50},
+    {"name": "Рикардо Милос", "rarity": "Легендарный 🟡", "power": 100},
+    {"name": "Пов: ты босс", "rarity": "Секретный 🔴", "power": 250}
+]
+
+def get_player(user_id, username):
+    if user_id not in players:
+        players[user_id] = {
+            "username": username or "Анон",
+            "balance": 999999,  # БЕСПЛАТНЫЙ ДЕМО-БАЛАНС
+            "inventory": [],
+            "score": 0
+        }
+    return players[user_id]
+
+def main_keyboard():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.row("📦 Открыть Кейс (БЕСПЛАТНО)", "🎒 Инвентарь")
+    markup.row("⚔️ Пойти в Батл", "💰 Мой Баланс")
+    return markup
+
+@bot.message_handler(commands=['start'])
+def start_cmd(message):
+    p = get_player(message.from_user.id, message.from_user.username)
+    welcome_text = (
+        f"🔥 Добро пожаловать в Brainrot Battle Bot! (ДЕМО-РЕЖИМ)\n\n"
+        f"🎁 Вам начислено: {p['balance']:,} монет!\n"
+        f"Все кейсы абсолютно бесплатны. Собирайте мемы и побеждайте!"
+    )
+    bot.send_message(message.chat.id, welcome_text, reply_markup=main_keyboard())
+
+@bot.message_handler(func=lambda msg: msg.text == "📦 Открыть Кейс (БЕСПЛАТНО)")
+def open_case(message):
+    p = get_player(message.from_user.id, message.from_user.username)
+    
+    # В оригинале тут списывались бы деньги, но у нас демо-режим (цена = 0)
+    meme = random.choice(MEMES)
+    p["inventory"].append(meme)
+    
+    res = (
+        f"🎉 Вы открыли БРЕЙНРОТ КЕЙС!\n\n"
+        f"Выпал персонаж: *{meme['name']}*\n"
+        f"Редкость: {meme['rarity']}\n"
+        f"Сила: 💪 {meme['power']}"
+    )
+    bot.send_message(message.chat.id, res, parse_mode="Markdown", reply_markup=main_keyboard())
+
+@bot.message_handler(func=lambda msg: msg.text == "🎒 Инвентарь")
+def show_inventory(message):
+    p = get_player(message.from_user.id, message.from_user.username)
+    if not p["inventory"]:
+        bot.send_message(message.chat.id, "Ваш инвентарь пуст. Откройте бесплатный кейс!", reply_markup=main_keyboard())
+        return
+        
+    text = "🎒 Ваши Брейнроты:\n\n"
+    for i, item in enumerate(p["inventory"], 1):
+        text += f"{i}. {item['name']} ({item['rarity']}) — Сила: {item['power']}\n"
+    bot.send_message(message.chat.id, text, reply_markup=main_keyboard())
+
+@bot.message_handler(func=lambda msg: msg.text == "💰 Мой Баланс")
+def show_balance(message):
+    p = get_player(message.from_user.id, message.from_user.username)
+    bot.send_message(message.chat.id, f"💵 Ваш баланс: {p['balance']:,} монет (Демо-режим)", reply_markup=main_keyboard())
+
+@bot.message_handler(func=lambda msg: msg.text == "⚔️ Пойти в Батл")
+def start_battle(message):
+    p = get_player(message.from_user.id, message.from_user.username)
+    if not p["inventory"]:
+        bot.send_message(message.chat.id, "❌ У вас нет бойцов! Сначала откройте кейс.", reply_markup=main_keyboard())
+        return
+        
+    # Выбираем сильнейшего мем-бойца игрока
+    best_fighter = max(p["inventory"], key=lambda x: x["power"])
+    enemy_fighter = random.choice(MEMES)
+    
+    bot.send_message(message.chat.id, f"⚔️ Начинается бой!\n\nВаш боец: {best_fighter['name']} (Сила {best_fighter['power']})\nПротивник: {enemy_fighter['name']} (Сила {enemy_fighter['power']})")
+    
+    # Рассчитываем победу (рандом + влияние силы)
+    total_power = best_fighter['power'] + enemy_fighter['power']
+    win_chance = (best_fighter['power'] / total_power) * 100
+    
+    if random.randint(1, 100) <= win_chance:
+        p["score"] += 10
+        bot.send_message(message.chat.id, f"🏆 Вы победили! Вы заработали +10 очков рейтинга. Счет: {p['score']}", reply_markup=main_keyboard())
+    else:
+        bot.send_message(message.chat.id, f"💀 Вы проиграли! Ваш боец оказался слабее. Попробуйте выбить более редкого мема!", reply_markup=main_keyboard())
+
+if __name__ == "__main__":
+    print("Бот успешно запущен в демо-режиме...")
+    bot.infinity_polling()
