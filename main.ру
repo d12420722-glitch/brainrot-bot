@@ -6,6 +6,8 @@ from telebot import TeleBot, types
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "ВАШ_ТОКЕН_ИЗ_BOTFATHER")
 bot = TeleBot(BOT_TOKEN)
 
+bot.remove_webhook()
+
 # Простая база данных в памяти (после перезапуска обнуляется)
 # В ДЕМО-РЕЖИМЕ: даем сразу много денег
 players = {}
